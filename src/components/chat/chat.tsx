@@ -1,11 +1,11 @@
 import { ChatList } from './chat-list'
 import { ChatPanel } from './chat-panel'
-import { type Message } from './chat-message'
-import { cn } from '../../src/lib/utils'
+import { cn } from '@/lib/utils'
+import { ChatMessage } from '@/types'
 
 interface ChatProps {
   className?: string
-  messages: Message[]
+  messages: ChatMessage[]
   onSendMessage: (message: string) => void
   isLoading?: boolean
   onStop?: () => void

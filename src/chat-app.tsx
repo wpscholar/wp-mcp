@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { Chat } from '../components/chat/chat';
-import { Button } from '../components/ui/button';
+import { Chat } from '@/components/chat/chat';
+import { Button } from '@/components/ui/button';
 import { 
   ChatMessage, 
   ToolResult, 

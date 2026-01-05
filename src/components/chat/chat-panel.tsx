@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Button } from '../ui/button'
 import { Textarea } from '../ui/textarea'
-import { cn } from '../../src/lib/utils'
+import { cn } from '@/lib/utils'
 import { Send, Square } from 'lucide-react'
 
 interface ChatPanelProps {

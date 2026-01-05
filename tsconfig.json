@@ -23,13 +23,11 @@
     /* Path mapping for absolute imports */
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
-      "@/components/*": ["./components/*"]
+      "@/*": ["./src/*"]
     }
   },
   "include": [
-    "src",
-    "components"
+    "src"
   ],
   "references": [
     { "path": "./tsconfig.node.json" }

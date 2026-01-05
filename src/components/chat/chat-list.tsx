@@ -1,8 +1,9 @@
 import { useRef, useEffect } from 'react'
-import { ChatMessage, type Message } from './chat-message'
+import { ChatMessage as ChatMessageComponent } from './chat-message'
+import { ChatMessage } from '@/types'
 
 interface ChatListProps {
-  messages: Message[]
+  messages: ChatMessage[]
   isLoading?: boolean
 }
 
@@ -18,7 +19,7 @@ export function ChatList({ messages, isLoading }: ChatListProps) {
       {messages.length > 0 ? (
         <div className="pb-4 px-4">
           {messages.map((message) => (
-            <ChatMessage key={message.id} message={message} />
+            <ChatMessageComponent key={message.id} message={message} />
           ))}
           {isLoading && (
             <div className="flex justify-center py-4">

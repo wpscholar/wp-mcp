@@ -1,29 +1,9 @@
-import { cn } from '../../src/lib/utils'
+import { cn } from '@/lib/utils'
 import { SimpleMarkdown } from '../ui/simple-markdown'
-
-export interface Message {
-  id: string
-  role: 'user' | 'assistant' | 'system'
-  content: string
-  timestamp: Date
-  toolCalls?: ToolCall[]
-  toolResults?: ToolResult[]
-}
-
-export interface ToolCall {
-  id: string
-  name: string
-  arguments: Record<string, any>
-}
-
-export interface ToolResult {
-  id: string
-  result: any
-  error?: string
-}
+import { ChatMessage as ChatMessageType } from '@/types'
 
 interface ChatMessageProps {
-  message: Message
+  message: ChatMessageType
   className?: string
 }
 
