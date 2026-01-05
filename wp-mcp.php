@@ -50,27 +50,27 @@ class WP_MCP {
     }
     
     /**
-     * Initialize hooks
+     * Initialize hooks.
      */
     private function init_hooks() {
-        add_action('init', array($this, 'init'));
-        register_activation_hook(__FILE__, array($this, 'activate'));
-        register_deactivation_hook(__FILE__, array($this, 'deactivate'));
+        add_action( 'init', array( $this, 'init' ) );
+        register_activation_hook( __FILE__, array( $this, 'activate' ) );
+        register_deactivation_hook( __FILE__, array( $this, 'deactivate' ) );
+
+        // Register cron hook for session cleanup.
+        add_action( 'wp_mcp_cleanup_sessions', array( __CLASS__, 'cleanup_old_sessions' ) );
     }
     
     /**
-     * Load plugin dependencies
+     * Load plugin dependencies.
      */
     private function load_dependencies() {
-        // Load Composer autoloader if it exists
-        if (file_exists(WP_MCP_PLUGIN_DIR . 'vendor/autoload.php')) {
+        // Load Composer autoloader if it exists.
+        if ( file_exists( WP_MCP_PLUGIN_DIR . 'vendor/autoload.php' ) ) {
             require_once WP_MCP_PLUGIN_DIR . 'vendor/autoload.php';
-            error_log('WP MCP: Composer autoloader loaded successfully');
-        } else {
-            error_log('WP MCP: Composer autoloader not found at: ' . WP_MCP_PLUGIN_DIR . 'vendor/autoload.php');
         }
 
-        // Plugin classes are now autoloaded via Composer PSR-4
+        // Plugin classes are now autoloaded via Composer PSR-4.
     }
     
     /**
@@ -95,55 +95,44 @@ class WP_MCP {
     }
     
     /**
-     * Initialize WordPress APIs (Abilities API and MCP Adapter)
+     * Initialize WordPress APIs (Abilities API and MCP Adapter).
      */
     private function init_wordpress_apis() {
-        // Initialize WordPress Abilities API if available
-        if (file_exists(WP_MCP_PLUGIN_DIR . 'vendor/wordpress/abilities-api/abilities-api.php')) {
+        // Initialize WordPress Abilities API if available.
+        if ( file_exists( WP_MCP_PLUGIN_DIR . 'vendor/wordpress/abilities-api/abilities-api.php' ) ) {
             require_once WP_MCP_PLUGIN_DIR . 'vendor/wordpress/abilities-api/abilities-api.php';
-            error_log('WP MCP: Abilities API loaded');
-        } else {
-            error_log('WP MCP: Abilities API not found at expected path');
         }
-        
-        // Initialize MCP Adapter and create server if available
-        if (class_exists('WP\MCP\Core\McpAdapter')) {
-            add_action('mcp_adapter_init', function($adapter) {
-                error_log('WP MCP: Creating MCP server with WordPress abilities');
-                
-                $server = $adapter->create_server(
-                    'default-server',                                         // Unique server identifier
-                    'mcp',                                                   // REST API namespace
-                    'mcp-adapter-default-server',                          // REST API route
-                    'WordPress MCP Server',                                 // Server name
-                    'WordPress MCP server providing access to WordPress abilities', // Server description
-                    '1.0.0',                                               // Server version
-                    [                                                      // Transport methods
-                        \WP\MCP\Transport\HttpTransport::class,            // MCP 2025-06-18 compliant
-                    ],
-                    \WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler::class, // Error handler
-                    \WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler::class, // Observability handler
-                    [                                                      // Abilities to expose as tools
-                        'wp-mcp/create-post',
-                        'wp-mcp/list-posts', 
-                        'wp-mcp/get-post',
-                        'wp-mcp/get-site-info',
-                    ],
-                    [],                                                    // Resources (optional)
-                    [],                                                    // Prompts (optional)
-                );
-                
-                error_log('WP MCP: MCP server created - ' . ($server ? 'SUCCESS' : 'FAILED'));
-            });
-            
-            // Abilities will be registered automatically when the API is initialized
-            
-            // Initialize the MCP Adapter to trigger the mcp_adapter_init action
-            error_log('WP MCP: MCP Adapter class found - initializing');
+
+        // Initialize MCP Adapter and create server if available.
+        if ( class_exists( 'WP\MCP\Core\McpAdapter' ) ) {
+            add_action(
+                'mcp_adapter_init',
+                function ( $adapter ) {
+                    $adapter->create_server(
+                        'default-server',
+                        'mcp',
+                        'mcp-adapter-default-server',
+                        'WordPress MCP Server',
+                        'WordPress MCP server providing access to WordPress abilities',
+                        '1.0.0',
+                        array(
+                            \WP\MCP\Transport\HttpTransport::class,
+                        ),
+                        \WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler::class,
+                        \WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler::class,
+                        array(
+                            'wp-mcp/create-post',
+                            'wp-mcp/list-posts',
+                            'wp-mcp/get-post',
+                            'wp-mcp/get-site-info',
+                        ),
+                        array(),
+                        array()
+                    );
+                }
+            );
+
             \WP\MCP\Core\McpAdapter::instance();
-            error_log('WP MCP: MCP Adapter initialized');
-        } else {
-            error_log('WP MCP: MCP Adapter class not found');
         }
     }
     
@@ -174,42 +163,73 @@ class WP_MCP {
     }
     
     /**
-     * Plugin deactivation
+     * Plugin deactivation.
      */
     public function deactivate() {
-        // Clean up any temporary data
-        delete_transient('wp_mcp_chat_sessions');
-        
-        // Flush rewrite rules
+        // Clear scheduled cleanup event.
+        wp_clear_scheduled_hook( 'wp_mcp_cleanup_sessions' );
+
+        // Flush rewrite rules.
         flush_rewrite_rules();
     }
-    
+
     /**
-     * Create database tables
+     * Create database tables.
      */
     private function create_tables() {
         global $wpdb;
-        
+
         $charset_collate = $wpdb->get_charset_collate();
-        
-        // Chat sessions table
-        $table_name = $wpdb->prefix . 'mcp_chat_sessions';
-        
+        $table_name      = $wpdb->prefix . 'mcp_chat_sessions';
+
+        // Session ID is stored as VARCHAR (UUID format).
         $sql = "CREATE TABLE $table_name (
-            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            id varchar(36) NOT NULL,
             user_id bigint(20) unsigned NOT NULL,
             session_data longtext NOT NULL,
             created_at datetime DEFAULT CURRENT_TIMESTAMP,
             updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
-            KEY user_id (user_id)
+            KEY user_id (user_id),
+            KEY user_session (user_id, id),
+            KEY updated_at (updated_at)
         ) $charset_collate;";
-        
-        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-        dbDelta($sql);
-        
-        // Update version option
-        update_option('wp_mcp_db_version', WP_MCP_VERSION);
+
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+        dbDelta( $sql );
+
+        // Schedule cleanup event if not already scheduled.
+        if ( ! wp_next_scheduled( 'wp_mcp_cleanup_sessions' ) ) {
+            wp_schedule_event( time(), 'daily', 'wp_mcp_cleanup_sessions' );
+        }
+
+        // Update version option.
+        update_option( 'wp_mcp_db_version', WP_MCP_VERSION );
+    }
+
+    /**
+     * Cleanup old chat sessions (runs daily via cron).
+     */
+    public static function cleanup_old_sessions() {
+        global $wpdb;
+
+        $table_name = $wpdb->prefix . 'mcp_chat_sessions';
+
+        /**
+         * Filter the number of days after which sessions are deleted.
+         *
+         * @param int $days Number of days to retain sessions. Default 30.
+         */
+        $retention_days = apply_filters( 'wp_mcp_session_retention_days', 30 );
+
+        // Delete sessions older than retention period.
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+        $wpdb->query(
+            $wpdb->prepare(
+                'DELETE FROM ' . $wpdb->prefix . 'mcp_chat_sessions WHERE updated_at < DATE_SUB(NOW(), INTERVAL %d DAY)',
+                $retention_days
+            )
+        );
     }
     
     /**

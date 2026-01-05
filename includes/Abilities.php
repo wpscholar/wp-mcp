@@ -37,22 +37,17 @@ class Abilities {
 	}
 
 	/**
-	 * Initialize hooks
+	 * Initialize hooks.
 	 */
 	private function init_hooks() {
-		error_log( 'WP MCP: Abilities class hooks being initialized' );
 		add_action( 'wp_abilities_api_categories_init', array( $this, 'register_ability_categories' ), 5 );
-		add_action( 'wp_abilities_api_init', array( $this, 'register_abilities' ), 5 ); // Early priority
-		error_log( 'WP MCP: Abilities hooks added for wp_abilities_api_init with priority 5' );
+		add_action( 'wp_abilities_api_init', array( $this, 'register_abilities' ), 5 );
 	}
 
 	/**
-	 * Register ability categories
+	 * Register ability categories.
 	 */
 	public function register_ability_categories() {
-		error_log( 'WP MCP: Registering custom abilities categories' );
-
-		// Register the ability category
 		if ( function_exists( 'wp_register_ability_category' ) ) {
 			wp_register_ability_category(
 				'wp-mcp',
@@ -61,34 +56,21 @@ class Abilities {
 					'description' => __( 'WordPress MCP plugin abilities for AI-powered content management.', 'wp-mcp' ),
 				)
 			);
-			error_log( 'WP MCP: Ability category registered' );
-		} else {
-			error_log( 'WP MCP: wp_register_ability_category function not available' );
 		}
 	}
 
 	/**
-	 * Register all custom abilities
+	 * Register all custom abilities.
 	 */
 	public function register_abilities() {
-		// Only register if both Abilities API and MCP Adapter are available
 		if ( ! function_exists( 'wp_register_ability' ) ) {
-			error_log( 'WP MCP: wp_register_ability function not available' );
 			return;
 		}
-
-		error_log( 'WP MCP: Registering custom abilities' );
 
 		$this->register_create_post_ability();
 		$this->register_list_posts_ability();
 		$this->register_get_post_ability();
-		$this->register_update_post_ability();
-		$this->register_delete_post_ability();
-		$this->register_list_users_ability();
 		$this->register_get_site_info_ability();
-		$this->register_manage_plugins_ability();
-
-		error_log( 'WP MCP: Finished registering abilities' );
 	}
 
 	/**
@@ -138,11 +120,6 @@ class Abilities {
 							'type'        => 'array',
 							'items'       => array( 'type' => 'string' ),
 							'description' => 'Tag names to assign to the post',
-						),
-						'featured_image_url' => array(
-							'type'        => 'string',
-							'format'      => 'uri',
-							'description' => 'Optional featured image URL',
 						),
 					),
 					'required'   => array( 'title', 'content' ),
@@ -401,40 +378,54 @@ class Abilities {
 		);
 	}
 
-
-	// Add placeholder for additional abilities
-	private function register_update_post_ability() {
-		// Implementation similar to create_post but for updating
-	}
-
-	private function register_delete_post_ability() {
-		// Implementation for deleting posts
-	}
-
-	private function register_list_users_ability() {
-		// Implementation for listing users
-	}
-
-	private function register_manage_plugins_ability() {
-		// Implementation for plugin management
-	}
-
 	/**
 	 * Execute create post ability
+	 *
+	 * @param array $input The input parameters.
+	 * @return array|\WP_Error The result or error.
 	 */
 	public function execute_create_post( $input = array() ) {
 		try {
+			// Whitelist of allowed post types.
+			$allowed_post_types = array( 'post', 'page' );
+
+			/**
+			 * Filter the allowed post types for creating posts via MCP.
+			 *
+			 * @param array $allowed_post_types List of allowed post type slugs.
+			 */
+			$allowed_post_types = apply_filters( 'wp_mcp_allowed_post_types', $allowed_post_types );
+
+			$post_type = sanitize_text_field( $input['post_type'] ?? 'post' );
+			if ( ! in_array( $post_type, $allowed_post_types, true ) ) {
+				return new \WP_Error(
+					'invalid_post_type',
+					sprintf(
+						/* translators: %s: post type slug */
+						__( 'Post type "%s" is not allowed.', 'wp-mcp' ),
+						$post_type
+					)
+				);
+			}
+
+			// Whitelist of allowed post statuses.
+			$allowed_statuses = array( 'publish', 'draft', 'private' );
+			$post_status      = sanitize_text_field( $input['status'] ?? 'draft' );
+			if ( ! in_array( $post_status, $allowed_statuses, true ) ) {
+				$post_status = 'draft';
+			}
+
 			$post_data = array(
 				'post_title'   => sanitize_text_field( $input['title'] ?? '' ),
 				'post_content' => wp_kses_post( $input['content'] ?? '' ),
 				'post_excerpt' => sanitize_textarea_field( $input['excerpt'] ?? '' ),
-				'post_status'  => sanitize_text_field( $input['status'] ?? 'draft' ),
-				'post_type'    => sanitize_text_field( $input['post_type'] ?? 'post' ),
+				'post_status'  => $post_status,
+				'post_type'    => $post_type,
 				'post_author'  => get_current_user_id(),
 			);
 
 			if ( empty( $post_data['post_title'] ) ) {
-				return new WP_Error( 'missing_title', __( 'Post title is required', 'wp-mcp' ) );
+				return new \WP_Error( 'missing_title', __( 'Post title is required', 'wp-mcp' ) );
 			}
 
 			$post_id = wp_insert_post( $post_data, true );
@@ -470,8 +461,8 @@ class Abilities {
 				'message'  => sprintf( __( 'Successfully created post "%1$s" with ID %2$d', 'wp-mcp' ), $post_data['post_title'], $post_id ),
 			);
 
-		} catch ( Exception $e ) {
-			return new WP_Error( 'execution_failed', $e->getMessage() );
+		} catch ( \Exception $e ) {
+			return new \WP_Error( 'execution_failed', $e->getMessage() );
 		}
 	}
 
@@ -503,7 +494,7 @@ class Abilities {
 				$args['category_name'] = sanitize_text_field( $input['category'] );
 			}
 
-			$query = new WP_Query( $args );
+			$query = new \WP_Query( $args );
 			$posts = array();
 
 			foreach ( $query->posts as $post ) {
@@ -526,8 +517,8 @@ class Abilities {
 				'message'     => sprintf( __( 'Found %d posts', 'wp-mcp' ), $query->found_posts ),
 			);
 
-		} catch ( Exception $e ) {
-			return new WP_Error( 'execution_failed', $e->getMessage() );
+		} catch ( \Exception $e ) {
+			return new \WP_Error( 'execution_failed', $e->getMessage() );
 		}
 	}
 
@@ -539,13 +530,13 @@ class Abilities {
 			$post_id = (int) ( $input['post_id'] ?? 0 );
 
 			if ( empty( $post_id ) ) {
-				return new WP_Error( 'missing_post_id', __( 'Post ID is required', 'wp-mcp' ) );
+				return new \WP_Error( 'missing_post_id', __( 'Post ID is required', 'wp-mcp' ) );
 			}
 
 			$post = get_post( $post_id );
 
 			if ( ! $post ) {
-				return new WP_Error( 'post_not_found', __( 'Post not found', 'wp-mcp' ) );
+				return new \WP_Error( 'post_not_found', __( 'Post not found', 'wp-mcp' ) );
 			}
 
 			$post_data = array(
@@ -581,8 +572,8 @@ class Abilities {
 				'message' => sprintf( __( 'Retrieved post "%s"', 'wp-mcp' ), $post->post_title ),
 			);
 
-		} catch ( Exception $e ) {
-			return new WP_Error( 'execution_failed', $e->getMessage() );
+		} catch ( \Exception $e ) {
+			return new \WP_Error( 'execution_failed', $e->getMessage() );
 		}
 	}
 
@@ -639,8 +630,8 @@ class Abilities {
 				'message' => __( 'Retrieved site information', 'wp-mcp' ),
 			);
 
-		} catch ( Exception $e ) {
-			return new WP_Error( 'execution_failed', $e->getMessage() );
+		} catch ( \Exception $e ) {
+			return new \WP_Error( 'execution_failed', $e->getMessage() );
 		}
 	}
 
@@ -650,11 +641,11 @@ class Abilities {
 	 */
 	public function check_edit_posts_permission( $input = array() ) {
 		if ( ! is_user_logged_in() ) {
-			return new WP_Error( 'authentication_required', __( 'User must be authenticated', 'wp-mcp' ) );
+			return new \WP_Error( 'authentication_required', __( 'User must be authenticated', 'wp-mcp' ) );
 		}
 
 		if ( ! current_user_can( 'edit_posts' ) ) {
-			return new WP_Error( 'insufficient_permissions', __( 'User cannot edit posts', 'wp-mcp' ) );
+			return new \WP_Error( 'insufficient_permissions', __( 'User cannot edit posts', 'wp-mcp' ) );
 		}
 
 		return true;
@@ -665,11 +656,11 @@ class Abilities {
 	 */
 	public function check_read_posts_permission( $input = array() ) {
 		if ( ! is_user_logged_in() ) {
-			return new WP_Error( 'authentication_required', __( 'User must be authenticated', 'wp-mcp' ) );
+			return new \WP_Error( 'authentication_required', __( 'User must be authenticated', 'wp-mcp' ) );
 		}
 
 		if ( ! current_user_can( 'read' ) ) {
-			return new WP_Error( 'insufficient_permissions', __( 'User cannot read content', 'wp-mcp' ) );
+			return new \WP_Error( 'insufficient_permissions', __( 'User cannot read content', 'wp-mcp' ) );
 		}
 
 		return true;
@@ -680,7 +671,7 @@ class Abilities {
 	 */
 	public function check_read_permission( $input = array() ) {
 		if ( ! is_user_logged_in() ) {
-			return new WP_Error( 'authentication_required', __( 'User must be authenticated', 'wp-mcp' ) );
+			return new \WP_Error( 'authentication_required', __( 'User must be authenticated', 'wp-mcp' ) );
 		}
 
 		return true;

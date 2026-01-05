@@ -72,79 +72,107 @@ class Admin {
     }
     
     /**
-     * Enqueue admin scripts and styles
+     * Enqueue admin scripts and styles.
+     *
+     * @param string $hook The current admin page hook.
      */
-    public function enqueue_admin_scripts($hook) {
-        // Only load on our admin pages
-        if (strpos($hook, 'wp-mcp') === false) {
+    public function enqueue_admin_scripts( $hook ) {
+        // Only load on our admin pages.
+        if ( strpos( $hook, 'wp-mcp' ) === false ) {
             return;
         }
-        
-        // Check if we're in development mode (has src dir but no built assets)
-        $is_dev = defined('WP_DEBUG') && WP_DEBUG && file_exists(WP_MCP_PLUGIN_DIR . 'src') && !file_exists(WP_MCP_PLUGIN_DIR . 'dist/.vite/manifest.json');
-        
-        // Debug information
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('WP MCP Debug: Development mode: ' . ($is_dev ? 'YES' : 'NO'));
-            error_log('WP MCP Debug: Manifest exists: ' . (file_exists(WP_MCP_PLUGIN_DIR . 'dist/.vite/manifest.json') ? 'YES' : 'NO'));
-            error_log('WP MCP Debug: Plugin dir: ' . WP_MCP_PLUGIN_DIR);
-        }
-        
+
+        // Check if we're in development mode (has src dir but no built assets).
+        $is_dev = defined( 'WP_DEBUG' ) && WP_DEBUG
+            && file_exists( WP_MCP_PLUGIN_DIR . 'src' )
+            && ! file_exists( WP_MCP_PLUGIN_DIR . 'dist/.vite/manifest.json' );
+
         $script_loaded = false;
-        
-        if ($is_dev) {
-            // Development mode: load from Vite dev server
+
+        if ( $is_dev ) {
+            // Development mode: load from Vite dev server.
             $script_loaded = $this->enqueue_dev_assets();
         } else {
-            // Production mode: load built assets
+            // Production mode: load built assets.
             $script_loaded = $this->enqueue_prod_assets();
         }
-        
-        // Localize script with WordPress data only if script was loaded
-        if ($script_loaded) {
-            wp_localize_script('wp-mcp-app', 'wpMcp', array(
-                'restUrl' => rest_url('wp-mcp/v1/'),
-                'mcpUrl' => rest_url('mcp/mcp-adapter-default-server'),
-                'nonce' => wp_create_nonce('wp_rest'),
-                'currentUser' => wp_get_current_user(),
-                'ajaxUrl' => admin_url('admin-ajax.php'),
-                'pluginUrl' => WP_MCP_PLUGIN_URL,
-                'isDebug' => defined('WP_DEBUG') && WP_DEBUG,
-            ));
+
+        // Localize script with WordPress data only if script was loaded.
+        if ( $script_loaded ) {
+            wp_localize_script(
+                'wp-mcp-app',
+                'wpMcp',
+                array(
+                    'restUrl'     => rest_url( 'wp-mcp/v1/' ),
+                    'mcpUrl'      => rest_url( 'mcp/mcp-adapter-default-server' ),
+                    'nonce'       => wp_create_nonce( 'wp_rest' ),
+                    'currentUser' => wp_get_current_user(),
+                    'ajaxUrl'     => admin_url( 'admin-ajax.php' ),
+                    'pluginUrl'   => WP_MCP_PLUGIN_URL,
+                    'isDebug'     => defined( 'WP_DEBUG' ) && WP_DEBUG,
+                )
+            );
         }
     }
     
     /**
-     * Enqueue development assets (Vite dev server)
+     * Enqueue development assets (Vite dev server).
+     *
+     * @return bool Whether assets were enqueued.
      */
-    private function enqueue_dev_assets() {
-        // Vite development client
+    private function enqueue_dev_assets(): bool {
+        /**
+         * Filter the Vite development server URL.
+         *
+         * @param string $vite_dev_url The Vite dev server base URL.
+         */
+        $vite_dev_url = apply_filters( 'wp_mcp_vite_dev_url', 'http://localhost:3000' );
+
+        // Allow override via constant.
+        if ( defined( 'WP_MCP_VITE_DEV_URL' ) ) {
+            $vite_dev_url = WP_MCP_VITE_DEV_URL;
+        }
+
+        $vite_dev_url = untrailingslashit( $vite_dev_url );
+
+        // Vite development client.
         wp_enqueue_script(
             'wp-mcp-vite-client',
-            'http://localhost:3000/@vite/client',
+            $vite_dev_url . '/@vite/client',
             array(),
             WP_MCP_VERSION,
             true
         );
-        
-        // Main application
+
+        // Main application.
         wp_enqueue_script(
             'wp-mcp-app',
-            'http://localhost:3000/src/main.tsx',
+            $vite_dev_url . '/src/main.tsx',
             array(),
             WP_MCP_VERSION,
             true
         );
-        
-        // Add module type
-        add_filter('script_loader_tag', function($tag, $handle) {
-            if (strpos($handle, 'wp-mcp') !== false) {
-                return str_replace('<script ', '<script type="module" ', $tag);
-            }
-            return $tag;
-        }, 10, 2);
-        
+
+        // Add module type filter for our specific scripts only.
+        add_filter( 'script_loader_tag', array( $this, 'add_module_type_to_script' ), 10, 2 );
+
         return true;
+    }
+
+    /**
+     * Add module type attribute to our scripts.
+     *
+     * @param string $tag    The script tag.
+     * @param string $handle The script handle.
+     * @return string Modified script tag.
+     */
+    public function add_module_type_to_script( $tag, $handle ) {
+        // Only modify our specific handles.
+        $module_handles = array( 'wp-mcp-vite-client', 'wp-mcp-app' );
+        if ( in_array( $handle, $module_handles, true ) ) {
+            return str_replace( '<script ', '<script type="module" ', $tag );
+        }
+        return $tag;
     }
     
     /**

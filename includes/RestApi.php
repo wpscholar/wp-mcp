@@ -56,7 +56,7 @@ class RestApi {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( $this, 'handle_chat_message' ),
-				'permission_callback' => array( $this, 'check_permissions' ),
+				'permission_callback' => array( $this, 'check_chat_permissions' ),
 				'args'                => array(
 					'message'    => array(
 						'required'          => true,
@@ -85,7 +85,7 @@ class RestApi {
 			array(
 				'methods'             => 'GET',
 				'callback'            => array( $this, 'get_chat_history' ),
-				'permission_callback' => array( $this, 'check_permissions' ),
+				'permission_callback' => array( $this, 'check_chat_permissions' ),
 				'args'                => array(
 					'session_id' => array(
 						'required'          => false,
@@ -110,7 +110,7 @@ class RestApi {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( $this, 'proxy_ai_request' ),
-				'permission_callback' => array( $this, 'check_permissions' ),
+				'permission_callback' => array( $this, 'check_ai_proxy_permissions' ),
 				'args'                => array(
 					'model'       => array(
 						'required' => true,
@@ -147,34 +147,145 @@ class RestApi {
 		// Note: MCP tools and resources endpoints are now provided by the WordPress MCP Adapter
 		// This plugin focuses on the chat interface and ability registration
 
-		// Settings endpoint
+		// Settings endpoint (admin only)
 		register_rest_route(
 			$namespace,
 			'/settings',
 			array(
 				'methods'             => 'GET',
 				'callback'            => array( $this, 'get_settings' ),
-				'permission_callback' => array( $this, 'check_permissions' ),
-			)
-		);
-
-		// Credentials endpoint (provides actual API keys for client initialization)
-		register_rest_route(
-			$namespace,
-			'/settings/credentials',
-			array(
-				'methods'             => 'GET',
-				'callback'            => array( $this, 'get_credentials' ),
-				'permission_callback' => array( $this, 'check_permissions' ),
+				'permission_callback' => array( $this, 'check_admin_permissions' ),
 			)
 		);
 	}
 
 	/**
-	 * Check permissions for API access
+	 * Check permissions for admin-level API access.
+	 *
+	 * @return bool|\WP_Error True if allowed, WP_Error otherwise.
+	 */
+	public function check_admin_permissions() {
+		if ( ! is_user_logged_in() ) {
+			return new \WP_Error(
+				'rest_not_logged_in',
+				__( 'You must be logged in to access this endpoint.', 'wp-mcp' ),
+				array( 'status' => 401 )
+			);
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return new \WP_Error(
+				'rest_forbidden',
+				__( 'You do not have permission to access this endpoint.', 'wp-mcp' ),
+				array( 'status' => 403 )
+			);
+		}
+
+		return true;
+	}
+
+	/**
+	 * Check permissions for chat-related API access (editors and above).
+	 *
+	 * @return bool|\WP_Error True if allowed, WP_Error otherwise.
+	 */
+	public function check_chat_permissions() {
+		if ( ! is_user_logged_in() ) {
+			return new \WP_Error(
+				'rest_not_logged_in',
+				__( 'You must be logged in to access this endpoint.', 'wp-mcp' ),
+				array( 'status' => 401 )
+			);
+		}
+
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			return new \WP_Error(
+				'rest_forbidden',
+				__( 'You do not have permission to use the chat feature.', 'wp-mcp' ),
+				array( 'status' => 403 )
+			);
+		}
+
+		// Rate limiting for chat endpoints.
+		if ( ! $this->check_rate_limit( 'chat', 30, 60 ) ) {
+			return new \WP_Error(
+				'rate_limit_exceeded',
+				__( 'Rate limit exceeded. Please wait before making more requests.', 'wp-mcp' ),
+				array( 'status' => 429 )
+			);
+		}
+
+		return true;
+	}
+
+	/**
+	 * Check permissions for AI proxy access (more restrictive).
+	 *
+	 * @return bool|\WP_Error True if allowed, WP_Error otherwise.
+	 */
+	public function check_ai_proxy_permissions() {
+		if ( ! is_user_logged_in() ) {
+			return new \WP_Error(
+				'rest_not_logged_in',
+				__( 'You must be logged in to access this endpoint.', 'wp-mcp' ),
+				array( 'status' => 401 )
+			);
+		}
+
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			return new \WP_Error(
+				'rest_forbidden',
+				__( 'You do not have permission to use the AI features.', 'wp-mcp' ),
+				array( 'status' => 403 )
+			);
+		}
+
+		// Stricter rate limiting for AI proxy (costs money).
+		if ( ! $this->check_rate_limit( 'ai_proxy', 10, 60 ) ) {
+			return new \WP_Error(
+				'rate_limit_exceeded',
+				__( 'AI request rate limit exceeded. Please wait before making more requests.', 'wp-mcp' ),
+				array( 'status' => 429 )
+			);
+		}
+
+		return true;
+	}
+
+	/**
+	 * Check rate limit using transients.
+	 *
+	 * @param string $action       The action being rate limited.
+	 * @param int    $max_requests Maximum requests allowed.
+	 * @param int    $period       Time period in seconds.
+	 * @return bool True if within limit, false if exceeded.
+	 */
+	private function check_rate_limit( string $action, int $max_requests, int $period ): bool {
+		$user_id       = get_current_user_id();
+		$transient_key = "wp_mcp_rate_{$action}_{$user_id}";
+		$requests      = get_transient( $transient_key );
+
+		if ( false === $requests ) {
+			set_transient( $transient_key, 1, $period );
+			return true;
+		}
+
+		if ( $requests >= $max_requests ) {
+			return false;
+		}
+
+		set_transient( $transient_key, $requests + 1, $period );
+		return true;
+	}
+
+	/**
+	 * Legacy permission check (alias for admin permissions).
+	 *
+	 * @deprecated Use check_admin_permissions() instead.
+	 * @return bool|\WP_Error
 	 */
 	public function check_permissions() {
-		return current_user_can( 'manage_options' );
+		return $this->check_admin_permissions();
 	}
 
 	/**
@@ -206,16 +317,16 @@ class RestApi {
 				)
 			);
 
-		} catch ( Exception $e ) {
-			return new WP_Error( 'chat_error', $e->getMessage(), array( 'status' => 500 ) );
+		} catch ( \Exception $e ) {
+			return new \WP_Error( 'chat_error', $e->getMessage(), array( 'status' => 500 ) );
 		}
 	}
 
 	/**
 	 * Get chat history
 	 *
-	 * @param WP_REST_Request $request The REST request object.
-	 * @return WP_REST_Response The response.
+	 * @param \WP_REST_Request $request The REST request object.
+	 * @return \WP_REST_Response|\WP_Error The response.
 	 */
 	public function get_chat_history( $request ) {
 		$session_id = $request->get_param( 'session_id' );
@@ -232,12 +343,15 @@ class RestApi {
 
 		global $wpdb;
 		$table_name = $wpdb->prefix . 'mcp_chat_sessions';
+		$user_id    = get_current_user_id();
 
+		// Validate session ownership - users can only access their own sessions.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		$session_data = $wpdb->get_var(
 			$wpdb->prepare(
-				"SELECT session_data FROM {$table_name} WHERE id = %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-				$session_id
+				'SELECT session_data FROM ' . $wpdb->prefix . 'mcp_chat_sessions WHERE id = %s AND user_id = %d',
+				$session_id,
+				$user_id
 			)
 		);
 
@@ -251,11 +365,18 @@ class RestApi {
 		}
 
 		$messages = json_decode( $session_data, true );
+		if ( json_last_error() !== JSON_ERROR_NONE ) {
+			return new \WP_Error(
+				'json_decode_error',
+				__( 'Failed to decode session data.', 'wp-mcp' ),
+				array( 'status' => 500 )
+			);
+		}
 		if ( ! is_array( $messages ) ) {
 			$messages = array();
 		}
 
-		// Apply limit
+		// Apply limit.
 		if ( $limit && count( $messages ) > $limit ) {
 			$messages = array_slice( $messages, -$limit );
 		}
@@ -277,7 +398,7 @@ class RestApi {
 		$bearer_token = get_option( 'wp_mcp_cloudflare_token' );
 
 		if ( empty( $gateway_url ) || empty( $bearer_token ) ) {
-			return new WP_Error(
+			return new \WP_Error(
 				'missing_ai_config',
 				__( 'AI Gateway configuration is missing. Please configure in settings.', 'wp-mcp' ),
 				array( 'status' => 400 )
@@ -331,7 +452,7 @@ class RestApi {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return new WP_Error(
+			return new \WP_Error(
 				'ai_request_failed',
 				$response->get_error_message(),
 				array( 'status' => 500 )
@@ -346,7 +467,7 @@ class RestApi {
 			// For streaming, we need to pass through the stream directly
 			// This is more complex and requires special handling
 			// For now, we'll return an error for streaming requests
-			return new WP_Error(
+			return new \WP_Error(
 				'streaming_not_supported',
 				__( 'Streaming responses are not yet supported through the proxy.', 'wp-mcp' ),
 				array( 'status' => 501 )
@@ -357,7 +478,7 @@ class RestApi {
 		$data = json_decode( $response_body, true );
 
 		if ( 200 !== $response_code ) {
-			return new WP_Error(
+			return new \WP_Error(
 				'ai_request_error',
 				$data['error']['message'] ?? __( 'AI request failed', 'wp-mcp' ),
 				array( 'status' => $response_code )
@@ -382,20 +503,6 @@ class RestApi {
 	}
 
 	/**
-	 * Get actual API credentials (unmasked)
-	 */
-	public function get_credentials( $request ) {
-		return rest_ensure_response(
-			array(
-				'success'                => true,
-				'openai_api_key'         => get_option( 'wp_mcp_openai_api_key', '' ),
-				'cloudflare_gateway_url' => get_option( 'wp_mcp_cloudflare_gateway_url', '' ),
-				'cloudflare_token'       => get_option( 'wp_mcp_cloudflare_token', '' ),
-			)
-		);
-	}
-
-	/**
 	 * Get plugin settings (sanitized for frontend)
 	 */
 	private function get_plugin_settings() {
@@ -410,15 +517,25 @@ class RestApi {
 	}
 
 	/**
-	 * Save message to chat history
+	 * Save message to chat history.
+	 *
+	 * @param string $session_id The session ID.
+	 * @param string $content    The message content.
+	 * @param string $role       The message role (user or assistant).
 	 */
-	private function save_message_to_history( $session_id, $content, $role ) {
+	private function save_message_to_history( string $session_id, string $content, string $role ): void {
 		if ( ! get_option( 'wp_mcp_chat_history_enabled', true ) ) {
 			return;
 		}
 
+		// Validate content length to prevent database bloat.
+		$max_content_length = 50000;
+		if ( strlen( $content ) > $max_content_length ) {
+			$content = substr( $content, 0, $max_content_length );
+		}
+
 		global $wpdb;
-		$table_name = $wpdb->prefix . 'mcp_chat_sessions';
+		$user_id = get_current_user_id();
 
 		$message_data = array(
 			'id'        => wp_generate_uuid4(),
@@ -427,29 +544,38 @@ class RestApi {
 			'timestamp' => current_time( 'mysql' ),
 		);
 
-		// Get existing session data or create new
+		// Get existing session data for current user only.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		$session_data = $wpdb->get_var(
 			$wpdb->prepare(
-				"SELECT session_data FROM {$table_name} WHERE id = %s",
-				$session_id
+				'SELECT session_data FROM ' . $wpdb->prefix . 'mcp_chat_sessions WHERE id = %s AND user_id = %d',
+				$session_id,
+				$user_id
 			)
 		);
 
-		$messages   = $session_data ? json_decode( $session_data, true ) : array();
+		$messages = array();
+		if ( $session_data ) {
+			$decoded = json_decode( $session_data, true );
+			if ( json_last_error() === JSON_ERROR_NONE && is_array( $decoded ) ) {
+				$messages = $decoded;
+			}
+		}
 		$messages[] = $message_data;
 
-		// Limit messages per session
+		// Limit messages per session.
 		$max_messages = (int) get_option( 'wp_mcp_max_messages_per_session', 100 );
 		if ( count( $messages ) > $max_messages ) {
 			$messages = array_slice( $messages, -$max_messages );
 		}
 
-		// Insert or update session
+		// Insert or update session.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 		$wpdb->replace(
-			$table_name,
+			$wpdb->prefix . 'mcp_chat_sessions',
 			array(
 				'id'           => $session_id,
-				'user_id'      => get_current_user_id(),
+				'user_id'      => $user_id,
 				'session_data' => wp_json_encode( $messages ),
 			),
 			array( '%s', '%d', '%s' )

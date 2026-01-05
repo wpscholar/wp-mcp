@@ -44,65 +44,27 @@ export function ChatApp({ config }: ChatAppProps) {
 
   // Initialize OpenAI client when settings change
   useEffect(() => {
-    async function initializeOpenAI() {
-      if (!settings) return;
+    if (!settings) return;
 
-      try {
-        // Fetch actual API credentials (not masked values)
-        const credentialsResponse = await fetch(`${config.restUrl}settings/credentials`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-WP-Nonce': config.nonce,
-          },
-        });
+    // Check if AI is configured using masked settings values.
+    // The actual API keys are never sent to the client for security.
+    // All AI requests go through the server-side proxy which has the real keys.
+    const hasOpenAIKey = settings.openai_api_key === '***';
+    const hasCloudflareGateway = settings.cloudflare_gateway_url && settings.cloudflare_gateway_url.trim() !== '';
 
-        if (credentialsResponse.ok) {
-          const credentials = await credentialsResponse.json();
-          console.log('Fetched credentials:', { 
-            success: credentials.success,
-            hasApiKey: !!(credentials.openai_api_key && credentials.openai_api_key.trim() !== ''),
-            hasGatewayUrl: !!(credentials.cloudflare_gateway_url && credentials.cloudflare_gateway_url.trim() !== ''),
-            hasToken: !!(credentials.cloudflare_token && credentials.cloudflare_token.trim() !== '')
-          });
-          
-          if (credentials.success) {
-            // Only initialize if we have either an OpenAI API key or Cloudflare gateway configured
-            const hasOpenAIKey = credentials.openai_api_key && credentials.openai_api_key.trim() !== '';
-            const hasCloudflareGateway = credentials.cloudflare_gateway_url && credentials.cloudflare_gateway_url.trim() !== '';
-            
-            if (hasOpenAIKey || hasCloudflareGateway) {
-              const openaiConfig: any = {
-                apiKey: credentials.openai_api_key || 'dummy-key',
-                model: hasCloudflareGateway ? 'openai/gpt-4o-mini' : 'gpt-4o-mini',
-              };
+    if (hasOpenAIKey || hasCloudflareGateway) {
+      const openaiConfig: any = {
+        // Use a placeholder key - the real key is used server-side
+        apiKey: 'server-side-proxy',
+        model: hasCloudflareGateway ? 'openai/gpt-4o-mini' : 'gpt-4o-mini',
+      };
 
-              // Don't set the baseURL here - the CloudflareOpenAIClient will use WordPress proxy
-              // The Cloudflare Gateway URL and token are used server-side by the proxy endpoint
-              // This avoids CORS issues since the browser only talks to WordPress
-              
-              console.log('Initializing OpenAI client using WordPress proxy endpoint');
-
-              const client = new CloudflareOpenAIClient(openaiConfig, config);
-              setOpenaiClient(client);
-            } else {
-              console.log('No OpenAI API key or Cloudflare Gateway configured');
-              setOpenaiClient(null);
-            }
-          } else {
-            console.error('Credentials fetch failed:', credentials);
-            setOpenaiClient(null);
-          }
-        } else {
-          console.error('Credentials endpoint returned error:', credentialsResponse.status, credentialsResponse.statusText);
-          setOpenaiClient(null);
-        }
-      } catch (error) {
-        console.error('Failed to initialize OpenAI client:', error);
-      }
+      // All AI calls go through the WordPress proxy endpoint which handles authentication
+      const client = new CloudflareOpenAIClient(openaiConfig, config);
+      setOpenaiClient(client);
+    } else {
+      setOpenaiClient(null);
     }
-
-    initializeOpenAI();
   }, [settings, config]);
 
   // Initialize MCP client
