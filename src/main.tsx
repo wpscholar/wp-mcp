@@ -60,8 +60,6 @@ function initializeMCPChat() {
         <ChatApp config={config} />
       </React.StrictMode>
     );
-
-    console.log('WP MCP: Chat application initialized successfully');
   } catch (error) {
     console.error('WP MCP: Failed to initialize chat application:', error);
     
