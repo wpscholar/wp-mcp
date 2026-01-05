@@ -385,7 +385,7 @@ Please check your settings and ensure the WordPress MCP Adapter is installed and
       <div className="px-4 py-2 border-t bg-muted/50 text-xs text-muted-foreground">
         <div className="flex items-center justify-between">
           <div>
-            {settings?.openai_api_key !== '***' ? (
+            {settings?.openai_api_key === '***' ? (
               <span className="text-green-600">✓ OpenAI configured</span>
             ) : (
               <span className="text-orange-600">⚠ OpenAI API key required</span>
