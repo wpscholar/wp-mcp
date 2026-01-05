@@ -107,10 +107,10 @@ The plugin supports two AI configuration options:
 
 The plugin automatically discovers and uses MCP tools from your WordPress installation:
 
-- `wp_create_post`: Create new WordPress posts
-- `wp_list_posts`: List WordPress posts with filters
-- `wp_get_post`: Get detailed information about a specific post
-- More tools available via the WordPress MCP Adapter
+- `wp-mcp/create-post`: Create new WordPress posts with title, content, status, and taxonomy terms
+- `wp-mcp/list-posts`: List WordPress posts with filters (type, status, search, category, author)
+- `wp-mcp/get-post`: Get detailed information about a specific post including content and metadata
+- `wp-mcp/get-site-info`: Get WordPress site information including name, URL, version, theme, and statistics
 
 ## Development
 
@@ -142,9 +142,10 @@ This creates optimized assets in the `dist/` directory that WordPress will autom
 wp-mcp/
 ├── wp-mcp.php                 # Main plugin file
 ├── includes/                  # PHP classes
-│   ├── class-admin.php       # Admin interface
-│   ├── class-rest-api.php    # REST API endpoints
-│   └── class-wp-mcp-abilities.php # Custom WordPress abilities registration
+│   ├── Plugin.php            # Main plugin class
+│   ├── Admin.php             # Admin interface
+│   ├── RestApi.php           # REST API endpoints
+│   └── Abilities.php         # MCP abilities registration
 ├── src/                      # TypeScript source
 │   ├── main.tsx             # Entry point
 │   ├── chat-app.tsx         # Main React component
@@ -196,6 +197,46 @@ Check WordPress logs and browser console for error details.
 - Input sanitization and validation on all endpoints
 - OpenAI API keys are masked in frontend configuration
 - MCP tool execution respects WordPress permissions
+
+## REST API Endpoints
+
+The plugin registers the following REST API endpoints under the `wp-mcp/v1` namespace:
+
+| Endpoint | Method | Description | Permission |
+|----------|--------|-------------|------------|
+| `/chat` | POST | Save a chat message to history | `read` capability |
+| `/chat/history` | GET | Retrieve chat history for a session | `read` capability |
+| `/ai/chat/completions` | POST | Proxy requests to OpenAI/Cloudflare | `read` capability |
+| `/settings` | GET | Get plugin settings | `manage_options` capability |
+
+## Hooks & Filters
+
+### Filters
+
+**`wp_mcp_allowed_post_types`**
+Filter the post types that can be created via MCP tools.
+```php
+add_filter( 'wp_mcp_allowed_post_types', function( $types ) {
+    $types[] = 'custom_post_type';
+    return $types;
+});
+```
+
+**`wp_mcp_session_retention_days`**
+Control how long chat sessions are retained before cleanup (default: 30 days).
+```php
+add_filter( 'wp_mcp_session_retention_days', function( $days ) {
+    return 7; // Keep sessions for 7 days
+});
+```
+
+**`wp_mcp_vite_dev_url`**
+Override the Vite development server URL.
+```php
+add_filter( 'wp_mcp_vite_dev_url', function( $url ) {
+    return 'http://localhost:3000';
+});
+```
 
 ## Contributing
 
