@@ -81,8 +81,7 @@ export class WordPressMCPClient implements MCPClient {
     try {
       // Use the direct MCP endpoint URL from WordPress configuration
       const mcpEndpoint = this.config.mcpUrl;
-      console.log('Connecting to MCP endpoint:', mcpEndpoint);
-      
+
       // Create HTTP transport with WordPress authentication headers
       this.transport = new StreamableHTTPClientTransport(new URL(mcpEndpoint), {
         requestInit: {
@@ -98,8 +97,6 @@ export class WordPressMCPClient implements MCPClient {
 
       this.connected = true;
       this.emit({ type: 'connected' });
-      
-      console.log('Connected to WordPress MCP Adapter via SDK');
     } catch (error) {
       const mcpError = error instanceof MCPError ? error : new MCPError(`Connection failed: ${error}`);
       this.emit({ type: 'error', data: mcpError });
@@ -117,9 +114,6 @@ export class WordPressMCPClient implements MCPClient {
 
     try {
       // The SDK has already handled initialization during connect()
-      // Let's get the server info and load tools/resources
-      console.log('MCP Client initialized via SDK');
-      
       // Load initial tools and resources using SDK methods
       await Promise.all([
         this.loadTools(),
@@ -168,7 +162,6 @@ export class WordPressMCPClient implements MCPClient {
     try {
       // Use the SDK's listTools method - it handles all the protocol details
       const result = await this.client.listTools();
-      console.log('Tools loaded via SDK:', result);
 
       // Convert SDK tools format to our internal format
       this.tools = result.tools.map(tool => ({
@@ -182,7 +175,6 @@ export class WordPressMCPClient implements MCPClient {
       }));
 
       this.emit({ type: 'tools_updated', data: this.tools });
-      console.log(`Loaded ${this.tools.length} tools via MCP SDK`);
     } catch (error) {
       console.error('Failed to load tools via SDK:', error);
       this.tools = [];
@@ -198,11 +190,8 @@ export class WordPressMCPClient implements MCPClient {
     }
 
     try {
-      console.log(`Calling tool "${name}" with args:`, args);
-      
       // Use the SDK's callTool method - it handles all the protocol details
       const result = await this.client.callTool({ name, arguments: args });
-      console.log(`Tool "${name}" result:`, result);
 
       // Convert SDK result format to our internal format
       const toolResult: MCPToolResult = {
@@ -238,7 +227,6 @@ export class WordPressMCPClient implements MCPClient {
     try {
       // Use the SDK's listResources method - it handles all the protocol details
       const result = await this.client.listResources();
-      console.log('Resources loaded via SDK:', result);
 
       // Convert SDK resources format to our internal format
       this.resources = result.resources.map(resource => ({
@@ -249,7 +237,6 @@ export class WordPressMCPClient implements MCPClient {
       }));
 
       this.emit({ type: 'resources_updated', data: this.resources });
-      console.log(`Loaded ${this.resources.length} resources via MCP SDK`);
     } catch (error) {
       console.error('Failed to load resources via SDK:', error);
       this.resources = [];
@@ -265,11 +252,8 @@ export class WordPressMCPClient implements MCPClient {
     }
 
     try {
-      console.log(`Reading resource: ${uri}`);
-      
       // Use the SDK's readResource method - it handles all the protocol details
       const result = await this.client.readResource({ uri });
-      console.log(`Resource "${uri}" content:`, result);
 
       return result;
     } catch (error) {
@@ -295,7 +279,6 @@ export class WordPressMCPClient implements MCPClient {
       this.tools = [];
       this.resources = [];
       this.emit({ type: 'disconnected' });
-      console.log('Disconnected from MCP server via SDK');
     } catch (error) {
       console.error('Error during SDK disconnect:', error);
     }
