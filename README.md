@@ -25,8 +25,7 @@ A WordPress plugin that provides an AI-powered chat interface using the Model Co
 - PHP 8.0 or higher
 - Node.js 18.0 or higher
 - Composer
-- OpenAI API key
-- (Optional) Cloudflare AI Gateway endpoint
+- Cloudflare AI Gateway endpoint and API token
 
 ## Installation
 
@@ -69,24 +68,19 @@ The plugin requires the WordPress MCP Adapter to be installed and configured. Th
 1. Go to **MCP Chat → Settings** in your WordPress admin
 2. Configure the following settings:
 
-   - **OpenAI API Key**: Your OpenAI API key (required)
-   - **Cloudflare AI Gateway URL**: Optional Cloudflare endpoint for API calls
+   - **Cloudflare Gateway URL**: Your Cloudflare AI Gateway endpoint (required)
+   - **Cloudflare Token**: Your Cloudflare API token (required)
    - **MCP Server URL**: Usually auto-configured to your WordPress REST API
    - **Chat History**: Enable/disable chat history storage
    - **Max Messages**: Maximum messages per chat session
 
-### 3. API Configuration
+### 3. Cloudflare AI Gateway Configuration
 
-The plugin supports two AI configuration options:
+The plugin uses Cloudflare AI Gateway to proxy OpenAI API requests:
 
-#### Option A: Direct OpenAI API
-- **API Key**: Your OpenAI API key
-- **Base URL**: Leave empty (uses https://api.openai.com/v1)
-
-#### Option B: Cloudflare AI Gateway
-- **API Key**: Your OpenAI API key
-- **Base URL**: Your Cloudflare AI Gateway endpoint
+- **Cloudflare Gateway URL**: Your gateway endpoint
   - Format: `https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_slug}/openai`
+- **Cloudflare Token**: Your Cloudflare API token with AI Gateway permissions
 
 ## Usage
 
@@ -170,9 +164,9 @@ wp-mcp/
    - Run `npm run build` to create production assets
    - Check that the `dist/` directory exists
 
-3. **"OpenAI Configuration Required"**
-   - Add your OpenAI API key in the plugin settings
-   - Verify the API key is valid and has sufficient credits
+3. **"AI Gateway configuration is missing"**
+   - Configure your Cloudflare AI Gateway URL and token in the plugin settings
+   - Verify your Cloudflare account has AI Gateway enabled
 
 4. **Chat not loading**
    - Check browser console for JavaScript errors
@@ -195,7 +189,7 @@ Check WordPress logs and browser console for error details.
 - All API calls are authenticated using WordPress nonces
 - User capabilities are checked for admin access
 - Input sanitization and validation on all endpoints
-- OpenAI API keys are masked in frontend configuration
+- API tokens are masked in frontend configuration
 - MCP tool execution respects WordPress permissions
 
 ## REST API Endpoints
