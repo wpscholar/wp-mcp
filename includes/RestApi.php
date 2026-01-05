@@ -235,42 +235,6 @@ class RestApi {
 	}
 
 	/**
-	 * Check rate limit using transients.
-	 *
-	 * @param string $action       The action being rate limited.
-	 * @param int    $max_requests Maximum requests allowed.
-	 * @param int    $period       Time period in seconds.
-	 * @return bool True if within limit, false if exceeded.
-	 */
-	private function check_rate_limit( string $action, int $max_requests, int $period ): bool {
-		$user_id       = get_current_user_id();
-		$transient_key = "wp_mcp_rate_{$action}_{$user_id}";
-		$requests      = get_transient( $transient_key );
-
-		if ( false === $requests ) {
-			set_transient( $transient_key, 1, $period );
-			return true;
-		}
-
-		if ( $requests >= $max_requests ) {
-			return false;
-		}
-
-		set_transient( $transient_key, $requests + 1, $period );
-		return true;
-	}
-
-	/**
-	 * Legacy permission check (alias for admin permissions).
-	 *
-	 * @deprecated Use check_admin_permissions() instead.
-	 * @return bool|\WP_Error
-	 */
-	public function check_permissions() {
-		return $this->check_admin_permissions();
-	}
-
-	/**
 	 * Handle chat message - saves message to history
 	 *
 	 * @param WP_REST_Request $request The REST request object.
@@ -469,8 +433,6 @@ class RestApi {
 
 		return rest_ensure_response( $data );
 	}
-
-	// MCP tools and resources methods removed - now handled by WordPress MCP Adapter
 
 	/**
 	 * Get plugin settings

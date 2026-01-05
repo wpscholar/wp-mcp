@@ -639,7 +639,7 @@ class Abilities {
 	/**
 	 * Check if user can edit posts
 	 */
-	public function check_edit_posts_permission( $input = array() ) {
+	public function check_edit_posts_permission() {
 		if ( ! is_user_logged_in() ) {
 			return new \WP_Error( 'authentication_required', __( 'User must be authenticated', 'wp-mcp' ) );
 		}
@@ -654,7 +654,7 @@ class Abilities {
 	/**
 	 * Check if user can read posts
 	 */
-	public function check_read_posts_permission( $input = array() ) {
+	public function check_read_posts_permission() {
 		if ( ! is_user_logged_in() ) {
 			return new \WP_Error( 'authentication_required', __( 'User must be authenticated', 'wp-mcp' ) );
 		}
@@ -669,7 +669,7 @@ class Abilities {
 	/**
 	 * Check basic read permission
 	 */
-	public function check_read_permission( $input = array() ) {
+	public function check_read_permission() {
 		if ( ! is_user_logged_in() ) {
 			return new \WP_Error( 'authentication_required', __( 'User must be authenticated', 'wp-mcp' ) );
 		}
