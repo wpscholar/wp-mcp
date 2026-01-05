@@ -77,8 +77,8 @@ class Admin {
      * @param string $hook The current admin page hook.
      */
     public function enqueue_admin_scripts( $hook ) {
-        // Only load on our admin pages.
-        if ( strpos( $hook, 'wp-mcp' ) === false ) {
+        // Only load React app on the chat page, not settings.
+        if ( 'toplevel_page_wp-mcp-chat' !== $hook ) {
             return;
         }
 
