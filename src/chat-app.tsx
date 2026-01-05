@@ -53,15 +53,7 @@ export function ChatApp({ config }: ChatAppProps) {
     const hasCloudflareGateway = settings.cloudflare_gateway_url && settings.cloudflare_gateway_url.trim() !== '';
 
     if (hasOpenAIKey || hasCloudflareGateway) {
-      const openaiConfig: any = {
-        // Use a placeholder key - the real key is used server-side
-        apiKey: 'server-side-proxy',
-        model: hasCloudflareGateway ? 'openai/gpt-4o-mini' : 'gpt-4o-mini',
-      };
-
-      // All AI calls go through the WordPress proxy endpoint which handles authentication
-      const client = new CloudflareOpenAIClient(openaiConfig, config);
-      setOpenaiClient(client);
+      setOpenaiClient(new CloudflareOpenAIClient(config));
     } else {
       setOpenaiClient(null);
     }

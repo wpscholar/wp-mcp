@@ -1,6 +1,5 @@
 import OpenAI from 'openai';
-import { 
-  OpenAIConfig,
+import {
   ChatCompletionRequest,
   ChatMessage,
   ToolCall,
@@ -9,50 +8,24 @@ import {
   WordPressConfig
 } from './types';
 
+const DEFAULT_MODEL = 'openai/gpt-4o-mini';
+
 /**
- * OpenAI client with Cloudflare AI Gateway support
+ * OpenAI client that proxies requests through WordPress REST API
  */
 export class CloudflareOpenAIClient {
   private openai: OpenAI;
-  private config: OpenAIConfig;
 
-  constructor(
-    config: OpenAIConfig,
-    private wpConfig: WordPressConfig
-  ) {
-    this.config = config;
-    
-    // Use WordPress proxy endpoint to avoid CORS issues
-    // The proxy will handle the Cloudflare AI Gateway authentication
-    const clientConfig: any = {
-      apiKey: 'proxy', // Using WordPress proxy, no direct API key needed
-      baseURL: `${this.wpConfig.restUrl}ai`, // Use WordPress REST API as proxy
-      dangerouslyAllowBrowser: true, // Required for browser usage
-      defaultHeaders: {
-        'X-WP-Nonce': this.wpConfig.nonce, // WordPress authentication
-      },
-    };
-
-    this.openai = new OpenAI(clientConfig);
-  }
-
-  /**
-   * Update configuration
-   */
-  updateConfig(config: Partial<OpenAIConfig>): void {
-    this.config = { ...this.config, ...config };
-    
-    // Continue using WordPress proxy endpoint
-    const clientConfig: any = {
-      apiKey: 'proxy', // Using WordPress proxy
-      baseURL: `${this.wpConfig.restUrl}ai`, // Use WordPress REST API as proxy
+  constructor(private wpConfig: WordPressConfig) {
+    // Use WordPress proxy endpoint - all authentication handled server-side
+    this.openai = new OpenAI({
+      apiKey: 'proxy',
+      baseURL: `${this.wpConfig.restUrl}ai`,
       dangerouslyAllowBrowser: true,
       defaultHeaders: {
-        'X-WP-Nonce': this.wpConfig.nonce, // WordPress authentication
+        'X-WP-Nonce': this.wpConfig.nonce,
       },
-    };
-
-    this.openai = new OpenAI(clientConfig);
+    });
   }
 
   /**
@@ -61,7 +34,7 @@ export class CloudflareOpenAIClient {
   async createChatCompletion(request: ChatCompletionRequest): Promise<any> {
     try {
       const response = await this.openai.chat.completions.create({
-        model: request.model || this.config.model || 'gpt-4',
+        model: request.model || DEFAULT_MODEL,
         messages: request.messages as any,
         tools: request.tools,
         tool_choice: request.tool_choice,
@@ -225,7 +198,7 @@ export class CloudflareOpenAIClient {
     ]);
 
     const request: ChatCompletionRequest = {
-      model: this.config.model || 'gpt-4',
+      model: DEFAULT_MODEL,
       messages,
       tools: tools.length > 0 ? this.convertMCPToolsToOpenAI(tools) : undefined,
       tool_choice: tools.length > 0 ? 'auto' : undefined,

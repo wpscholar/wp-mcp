@@ -82,13 +82,6 @@ export interface ToolResult {
 }
 
 // OpenAI Types
-export interface OpenAIConfig {
-  apiKey: string;
-  baseURL?: string;
-  model?: string;
-  cloudflareToken?: string;
-}
-
 export interface ChatCompletionMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;
