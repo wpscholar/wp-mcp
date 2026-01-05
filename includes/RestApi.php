@@ -206,15 +206,6 @@ class RestApi {
 			);
 		}
 
-		// Rate limiting for chat endpoints.
-		if ( ! $this->check_rate_limit( 'chat', 30, 60 ) ) {
-			return new \WP_Error(
-				'rate_limit_exceeded',
-				__( 'Rate limit exceeded. Please wait before making more requests.', 'wp-mcp' ),
-				array( 'status' => 429 )
-			);
-		}
-
 		return true;
 	}
 
@@ -237,15 +228,6 @@ class RestApi {
 				'rest_forbidden',
 				__( 'You do not have permission to use the AI features.', 'wp-mcp' ),
 				array( 'status' => 403 )
-			);
-		}
-
-		// Stricter rate limiting for AI proxy (costs money).
-		if ( ! $this->check_rate_limit( 'ai_proxy', 10, 60 ) ) {
-			return new \WP_Error(
-				'rate_limit_exceeded',
-				__( 'AI request rate limit exceeded. Please wait before making more requests.', 'wp-mcp' ),
-				array( 'status' => 429 )
 			);
 		}
 
@@ -394,7 +376,7 @@ class RestApi {
 	 */
 	public function proxy_ai_request( $request ) {
 		// Get the Cloudflare configuration
-		$gateway_url = get_option( 'wp_mcp_cloudflare_gateway_url' );
+		$gateway_url  = get_option( 'wp_mcp_cloudflare_gateway_url' );
 		$bearer_token = get_option( 'wp_mcp_cloudflare_token' );
 
 		if ( empty( $gateway_url ) || empty( $bearer_token ) ) {
