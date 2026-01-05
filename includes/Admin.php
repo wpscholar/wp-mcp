@@ -5,15 +5,17 @@
  * @package WP_MCP
  */
 
+namespace WP_MCP;
+
 // Exit if accessed directly
-if (!defined('ABSPATH')) {
+if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
 /**
- * WP_MCP_Admin class
+ * Admin class
  */
-class WP_MCP_Admin {
+class Admin {
     
     private static $instance = null;
     

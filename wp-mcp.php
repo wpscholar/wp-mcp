@@ -69,11 +69,8 @@ class WP_MCP {
         } else {
             error_log('WP MCP: Composer autoloader not found at: ' . WP_MCP_PLUGIN_DIR . 'vendor/autoload.php');
         }
-        
-        // Load plugin classes
-        require_once WP_MCP_PLUGIN_DIR . 'includes/class-admin.php';
-        require_once WP_MCP_PLUGIN_DIR . 'includes/class-rest-api.php';
-        require_once WP_MCP_PLUGIN_DIR . 'includes/class-wp-mcp-abilities.php';
+
+        // Plugin classes are now autoloaded via Composer PSR-4
     }
     
     /**
@@ -84,17 +81,17 @@ class WP_MCP {
         load_plugin_textdomain('wp-mcp', false, dirname(plugin_basename(__FILE__)) . '/languages');
         
         // Initialize plugin components that need to hook into WordPress APIs
-        WP_MCP_Abilities::get_instance(); // Must be initialized before abilities_api_init
-        
+        \WP_MCP\Abilities::get_instance(); // Must be initialized before abilities_api_init
+
         // Initialize WordPress APIs
         $this->init_wordpress_apis();
-        
+
         // Initialize remaining components
         if (is_admin()) {
-            WP_MCP_Admin::get_instance();
+            \WP_MCP\Admin::get_instance();
         }
-        
-        WP_MCP_REST_API::get_instance();
+
+        \WP_MCP\RestApi::get_instance();
     }
     
     /**

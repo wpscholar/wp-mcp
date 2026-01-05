@@ -5,15 +5,17 @@
  * @package WP_MCP
  */
 
+namespace WP_MCP;
+
 // Exit if accessed directly
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
 /**
- * WP_MCP_Abilities class
+ * Abilities class
  */
-class WP_MCP_Abilities {
+class Abilities {
 
 	private static $instance = null;
 
