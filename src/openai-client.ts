@@ -8,7 +8,7 @@ import {
   WordPressConfig
 } from './types';
 
-const DEFAULT_MODEL = 'openai/gpt-4o-mini';
+const DEFAULT_MODEL = "gpt-4o-mini";
 
 /**
  * OpenAI client that proxies requests through WordPress REST API

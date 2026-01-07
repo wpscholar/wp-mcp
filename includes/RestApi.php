@@ -354,10 +354,6 @@ class RestApi {
 				'cf-aig-authorization' => 'Bearer ' . $cloudflare_token,
 				'Content-Type'         => 'application/json',
 			);
-			// Ensure openai/ prefix for Cloudflare
-			if ( strpos( $model, 'openai/' ) !== 0 ) {
-				$model = 'openai/' . $model;
-			}
 		} elseif ( ! empty( $openai_key ) ) {
 			// Use direct OpenAI API
 			$api_url = 'https://api.openai.com/v1/chat/completions';
@@ -365,8 +361,6 @@ class RestApi {
 				'Authorization' => 'Bearer ' . $openai_key,
 				'Content-Type'  => 'application/json',
 			);
-			// Strip openai/ prefix for direct OpenAI
-			$model = preg_replace( '/^openai\//', '', $model );
 		} else {
 			return new \WP_Error(
 				'missing_ai_config',
