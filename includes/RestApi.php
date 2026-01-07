@@ -336,24 +336,48 @@ class RestApi {
 	}
 
 	/**
-	 * Proxy AI requests to Cloudflare AI Gateway
+	 * Proxy AI requests to OpenAI or Cloudflare AI Gateway
 	 */
 	public function proxy_ai_request( $request ) {
-		// Get the Cloudflare configuration
-		$gateway_url  = get_option( 'wp_mcp_cloudflare_gateway_url' );
-		$bearer_token = get_option( 'wp_mcp_cloudflare_token' );
+		// Get configuration options
+		$cloudflare_token = get_option( 'wp_mcp_cloudflare_token' );
+		$openai_key       = get_option( 'wp_mcp_openai_api_key' );
+		$gateway_url      = get_option( 'wp_mcp_cloudflare_gateway_url' );
 
-		if ( empty( $gateway_url ) || empty( $bearer_token ) ) {
+		// Determine which provider to use and set up request parameters
+		$model = $request->get_param( 'model' );
+
+		if ( ! empty( $cloudflare_token ) && ! empty( $gateway_url ) ) {
+			// Use Cloudflare AI Gateway
+			$api_url = $gateway_url . '/chat/completions';
+			$headers = array(
+				'cf-aig-authorization' => 'Bearer ' . $cloudflare_token,
+				'Content-Type'         => 'application/json',
+			);
+			// Ensure openai/ prefix for Cloudflare
+			if ( strpos( $model, 'openai/' ) !== 0 ) {
+				$model = 'openai/' . $model;
+			}
+		} elseif ( ! empty( $openai_key ) ) {
+			// Use direct OpenAI API
+			$api_url = 'https://api.openai.com/v1/chat/completions';
+			$headers = array(
+				'Authorization' => 'Bearer ' . $openai_key,
+				'Content-Type'  => 'application/json',
+			);
+			// Strip openai/ prefix for direct OpenAI
+			$model = preg_replace( '/^openai\//', '', $model );
+		} else {
 			return new \WP_Error(
 				'missing_ai_config',
-				__( 'AI Gateway configuration is missing. Please configure in settings.', 'wp-mcp' ),
+				__( 'AI configuration is missing. Please configure an OpenAI API key or Cloudflare AI Gateway in settings.', 'wp-mcp' ),
 				array( 'status' => 400 )
 			);
 		}
 
 		// Prepare the request body
 		$body = array(
-			'model'    => $request->get_param( 'model' ),
+			'model'    => $model,
 			'messages' => $request->get_param( 'messages' ),
 		);
 
@@ -383,14 +407,11 @@ class RestApi {
 			$body['temperature'] = $temperature;
 		}
 
-		// Make the request to Cloudflare AI Gateway
+		// Make the request to the AI provider
 		$response = wp_remote_post(
-			$gateway_url . '/chat/completions',
+			$api_url,
 			array(
-				'headers'     => array(
-					'Authorization' => 'Bearer ' . $bearer_token,
-					'Content-Type'  => 'application/json',
-				),
+				'headers'     => $headers,
 				'body'        => wp_json_encode( $body ),
 				'timeout'     => 30,
 				'data_format' => 'body',
